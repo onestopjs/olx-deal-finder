@@ -1,0 +1,118 @@
+name: 🚀 Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump"
+        default: minor
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Bump version in pyproject.toml
+        id: bump
+        run: |
+          BUMP="${{ github.event.inputs.bump }}"
+          CURRENT=$(sed -n -E 's/^version = "([0-9]+\.[0-9]+\.[0-9]+).*"/\1/p' pyproject.toml | head -n1)
+          if [[ -z "$CURRENT" ]]; then
+            echo "Failed to detect current version from pyproject.toml" >&2
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          case "$BUMP" in
+            major)
+              MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor)
+              MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch)
+              PATCH=$((PATCH+1)) ;;
+            *)
+              echo "Invalid bump type: $BUMP" >&2; exit 1 ;;
+          esac
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          sed -i -E 's/^version = "[^"]+"/version = '"\"${VERSION}\""'/' pyproject.toml
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Bumped ${BUMP}: ${CURRENT} -> ${VERSION}"
+          echo "Updated pyproject.toml to ${VERSION}";
+          echo "pyproject_after<<EOF" >> $GITHUB_OUTPUT
+          sed -n '1,80p' pyproject.toml >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Commit version bump and tag
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          if git diff --cached --quiet; then
+            echo "No changes to commit.";
+          else
+            git commit -m "chore: release v${VERSION}"
+          fi
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin HEAD
+          git push origin "v${VERSION}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.bump.outputs.version }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version }}
+          name: v${{ steps.bump.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

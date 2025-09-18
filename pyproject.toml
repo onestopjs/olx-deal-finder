@@ -1,0 +1,15 @@
+[project]
+name = "olx-deal-finder"
+version = "0.1.0"
+description = "LLM-powered OLX Deal Finder"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.116.1",
+    "langchain-anthropic>=0.3.20",
+    "langchain-ollama>=0.3.8",
+    "langchain-openai>=0.3.33",
+    "langgraph>=0.6.7",
+    "pydantic-settings>=2.10.1",
+    "uvicorn>=0.35.0",
+]

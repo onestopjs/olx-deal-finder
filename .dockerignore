@@ -1,0 +1,48 @@
+# VCS
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+
+# Environments
+.venv/
+venv/
+.env
+.env.*
+
+# Test/coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Build outputs
+build/
+dist/
+
+# Not needed in image
+*.log
+.ipynb_checkpoints/
+
+# Package manager caches
+pip-wheel-metadata/
+**/__pycache__/
+
+# Keep lockfiles & project metadata (do NOT ignore uv.lock or pyproject.toml)
+!pyproject.toml
+!uv.lock
